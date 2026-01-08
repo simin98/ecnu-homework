@@ -1,0 +1,14 @@
+TARGETS:=$(shell find . -type f -name "*.c" -exec basename -s .c -a {} \;)
+
+all: ${TARGETS}
+
+%: %.c
+	clang-19 -emit-llvm -S -fno-discard-value-names -O0 -Xclang -disable-O0-optnone -c -o $@.ll $< -g
+	opt-19 -load-pass-plugin ../build/InstrumentPass.so -passes="InstrumentPass" -S $@.ll -o $@.instrumented.ll
+	clang-19 -o $@ -L${PWD}/../build -lruntime -lm $@.instrumented.ll
+
+fuzz-%: %
+	@./test.sh $< 10s
+
+clean:
+	rm -rf *.ll *.cov ${TARGETS} core.* fuzz_output* out_*.txt
